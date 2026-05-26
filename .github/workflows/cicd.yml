@@ -1,4 +1,4 @@
-name: My React CI-file
+name: My React CICD-file
 
 on:
   push:
@@ -49,7 +49,8 @@ jobs:
     - name: Упаковка Артефакта (плоская структура)
       run: |
         cd backend
-        zip -r ../weather-report-app.zip . -x "*/node_modules/*" 
+        zip -r weather-report-app.zip . -x "*/node_modules/*"
+
 
     - name: Сохранение Артефакта
       uses: actions/upload-artifact@v4
@@ -58,38 +59,32 @@ jobs:
         path: weather-report-app.zip
         retention-days: 7
 
-  # 🛑🛑🛑 НОВЫЙ БЛОК: CD ПАЙПЛАЙН (РАЗВЕРТЫВАНИЕ ЧЕРЕЗ ANSIBLE И VAULT) НАЧАЛО 🛑🛑🛑
   deploy:
     needs: build_and_pack
     runs-on: ubuntu-latest
     steps:
-    - name: Скачиваем код репозитория
+    - name: Скачиваем код
       uses: actions/checkout@v4
 
-    - name: Скачиваем готовый ZIP-архив с полки GitHub
+    - name: Скачиваем Артефакт
       uses: actions/download-artifact@v4
-      with:
+      with: 
         name: app-build
         path: .
 
-    - name: Загружаем SSH-ключ в ssh-agent
+    - name: Загружаем ключи SSH
       uses: webfactory/ssh-agent@v0.9.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Установка Ansible
+    - name: Установка Ансибл
       run: |
         sudo apt-get update
         sudo apt-get install -y ansible
 
-    - name: Запуск Ansible Playbook с расшифровкой Vault
+    - name: Запуск Ансибл
       working-directory: ./ansible
       run: |
-        # 1. Записываем мастер-пароль от сейфа из секретов во временный файл
         echo "${{ secrets.VAULT_PASSWORD }}" > .vault_pass.txt
-        
-        # 2. Запускаем деплой. Ансибл сам прочитает hosts.ini и расшифрует group_vars
         ansible-playbook -i inventory.ini deploy.yml --vault-password-file .vault_pass.txt -vvv
-        # 3. Уничтожаем файл с паролем
         rm .vault_pass.txt
-  # 🛑🛑🛑 НОВЫЙ БЛОК: CD ПАЙПЛАЙН (РАЗВЕРТЫВАНИЕ ЧЕРЕЗ ANSIBLE И VAULT) КОНЕЦ 🛑🛑🛑
