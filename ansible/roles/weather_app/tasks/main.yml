@@ -31,7 +31,7 @@
   ansible.builtin.unarchive:
     src: "{{ playbook_dir }}/../weather-report-app.zip"
     dest: "{{ app_structure[0].path }}"
-    remove_src: no
+    remote_src: no
     owner: "{{ ansible_user }}"
 
 - name: "Установка NPM"
