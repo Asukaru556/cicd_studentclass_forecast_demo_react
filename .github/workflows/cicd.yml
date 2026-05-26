@@ -1,0 +1,95 @@
+name: My React CI-file
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Скачиваем код
+      uses: actions/checkout@v4
+
+    - name: Установка NodeJS
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+
+    - name: Установка пакетов и Тесты
+      working-directory: ./backend
+      run: |
+       npm ci
+       npm test
+
+  build_and_pack:
+    needs: test-backend
+    runs-on: ubuntu-latest
+    steps:
+    - name: Скачиваем код
+      uses: actions/checkout@v4
+
+    - name: Установка NodeJS
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+
+    - name: Сборка React
+      working-directory: ./frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Слияние (Монтируем frontend в директорию backend)
+      run: |
+        mkdir -p ./backend/public
+        rm -rf ./backend/public/*
+        cp -r ./frontend/dist/* ./backend/public/
+
+    - name: Упаковка Артефакта (плоская структура)
+      run: |
+        cd backend
+        zip -r ../weather-report-app.zip . -x "*/node_modules/*" 
+
+    - name: Сохранение Артефакта
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-build
+        path: weather-report-app.zip
+        retention-days: 7
+
+  # 🛑🛑🛑 НОВЫЙ БЛОК: CD ПАЙПЛАЙН (РАЗВЕРТЫВАНИЕ ЧЕРЕЗ ANSIBLE И VAULT) НАЧАЛО 🛑🛑🛑
+  deploy:
+    needs: build_and_pack
+    runs-on: ubuntu-latest
+    steps:
+    - name: Скачиваем код репозитория
+      uses: actions/checkout@v4
+
+    - name: Скачиваем готовый ZIP-архив с полки GitHub
+      uses: actions/download-artifact@v4
+      with:
+        name: app-build
+        path: .
+
+    - name: Загружаем SSH-ключ в ssh-agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Установка Ansible
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ansible
+
+    - name: Запуск Ansible Playbook с расшифровкой Vault
+      working-directory: ./ansible
+      run: |
+        # 1. Записываем мастер-пароль от сейфа из секретов во временный файл
+        echo "${{ secrets.VAULT_PASSWORD }}" > .vault_pass.txt
+        
+        # 2. Запускаем деплой. Ансибл сам прочитает hosts.ini и расшифрует group_vars
+        ansible-playbook -i inventory.ini deploy.yml --vault-password-file .vault_pass.txt -vvv
+        # 3. Уничтожаем файл с паролем
+        rm .vault_pass.txt
+  # 🛑🛑🛑 НОВЫЙ БЛОК: CD ПАЙПЛАЙН (РАЗВЕРТЫВАНИЕ ЧЕРЕЗ ANSIBLE И VAULT) КОНЕЦ 🛑🛑🛑
