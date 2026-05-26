@@ -49,7 +49,7 @@ jobs:
     - name: Упаковка Артефакта (плоская структура)
       run: |
         cd backend
-        zip -r weather-report-app.zip . -x "*/node_modules/*"
+        zip -r ../weather-report-app.zip . -x "*/node_modules/*"
 
 
     - name: Сохранение Артефакта
