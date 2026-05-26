@@ -44,6 +44,7 @@
   template:
     src: env.j2
     dest: "{{ app_structure[0].path }}/.env"
+    force: yes
   notify: "Refresh ENV"
 
 - name: Проверка установки Node js
