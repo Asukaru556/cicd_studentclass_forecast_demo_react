@@ -1,0 +1,55 @@
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Run backend tests
+      working-directory: ./backend
+      run: npm test
+
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run frontend linter
+      working-directory: ./frontend
+      run: npm run lint
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: Mount frontend into backend public dir
+      run: |
+        mkdir -p ./backend/public
+        rm -rf ./backend/public/*
+        cp -r ./frontend/dist/* ./backend/public/
+
+    - name: Package artifact
+      run: |
+        cd backend
+        zip -r ../weather-report-app.zip . -x "*/node_modules/*"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-build
+        path: weather-report-app.zip
+        retention-days: 7
